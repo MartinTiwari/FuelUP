@@ -1260,7 +1260,7 @@ Return format (all numbers as floats/ints, no strings for numbers):
   let lastErr;
   for (const model of models) {
     try {
-      const res = await fetch('https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiKey}', {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
