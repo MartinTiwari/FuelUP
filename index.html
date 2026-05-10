@@ -1243,18 +1243,61 @@ async function analyzeAIInput() {
 }
 
 async function callGemini(input) {
-  const prompt = `You are a precise nutrition expert. The user says they ate: "${input}"
+  const prompt = `
+You are a highly accurate nutrition analysis AI.
 
-Analyze EACH food item mentioned and return ONLY a valid JSON array. No markdown, no explanation, no backticks — just the raw JSON array.
+The user said:
+"${input}"
 
-IMPORTANT RULES:
-- Calculate calories from macros: calories = (protein * 4) + (carbs * 4) + (fat * 9). Make sure this is accurate.
-- Estimate quantities carefully based on what's described (e.g. "1 egg" ≈ 50g, "1 banana" ≈ 120g, "1 cup rice" ≈ 200g cooked, "2 slices bread" ≈ 60g)
-- Numbers represent the ACTUAL described amount, NOT per 100g
-- Use realistic, accurate nutritional values
+Your job is to estimate calories and macronutrients as accurately as possible using realistic nutritional references and cross-verification logic similar to trusted nutrition databases, restaurant nutrition data, food packaging values, and standard dietetic references.
 
-Return format (all numbers as floats/ints, no strings for numbers):
-[{"name":"Food Name with quantity","quantity_desc":"estimated weight","calories":200,"protein":10.5,"carbs":25.0,"fat":5.0}]`;
+Internally compare multiple common nutrition references before deciding final estimates.
+
+IMPORTANT:
+- Return ONLY valid JSON.
+- Do not use markdown.
+- Do not explain anything.
+- Do not include extra text.
+- Output must always be a JSON array.
+- All numbers must be actual numeric values, not strings.
+
+ACCURACY RULES:
+- Use realistic serving size estimation.
+- Estimate hidden oils, butter, sauces, sugar, and cooking fats realistically.
+- Do not underestimate calories.
+- Use cooked-food values when appropriate.
+- Use culturally accurate estimates for Nepali, Indian, Asian, Western, and mixed foods.
+- Understand vague quantities realistically:
+  - half plate
+  - bowl
+  - glass
+  - piece
+  - cup
+  - serving
+  - thaal
+- If quantity is unclear, assume a normal medium serving.
+- For restaurant or street foods, include realistic oil/fat usage.
+- Use biologically realistic macros.
+- Avoid impossible macro distributions.
+
+CALORIE CONSISTENCY:
+Calories should approximately match:
+(protein × 4) + (carbs × 4) + (fat × 9)
+
+OUTPUT FORMAT:
+[
+  {
+    "name": "food item",
+    "quantity_desc": "estimated serving",
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fat": 0
+  }
+]
+
+Return only the final JSON array.
+`;
 
   const models = ['gemini-2.5-flash-lite'];
   let lastErr;
