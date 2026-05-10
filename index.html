@@ -905,7 +905,7 @@
 let profile = {};
 let todayLog = [];
 let history = {};
-let geminiKey = 'AIzaSyDWn7u-kXRZWexNtpXZf8oW2H_twGapBxY';
+let geminiKey = '';
 let pendingAIItems = [];
 let selectedGoal = 'lose';
 let searchSelectedFood = null;
@@ -940,7 +940,7 @@ function loadData() {
   try {
     profile = JSON.parse(localStorage.getItem('fu_profile') || '{}');
     history = JSON.parse(localStorage.getItem('fu_history') || '{}');
-    //geminiKey = localStorage.getItem('fu_gemini_key') || '';
+    geminiKey = localStorage.getItem('fu_gemini_key') || '';
     todayLog = history[TODAY] || [];
   } catch(e) { console.log(e); }
 }
