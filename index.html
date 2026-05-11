@@ -512,7 +512,56 @@
     border-radius: 12px; padding: 12px; margin-bottom: 12px;
     font-size: 12px; color: var(--accent3); line-height: 1.6;
   }
+  /* Food Wisdom Card */
+.wisdom-card { margin-bottom: 12px; }
+.wisdom-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.wisdom-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--accent2); display: flex; align-items: center; gap: 6px;
+}
+.wisdom-title::before { content: '✦'; font-size: 10px; }
+.wisdom-refresh-btn {
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 11px; padding: 4px 10px; cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  display: flex; align-items: center; gap: 4px;
+}
+.wisdom-refresh-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+.wisdom-loading {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); padding: 6px 0;
+}
+.wisdom-empty {
+  font-size: 13px; color: var(--muted); text-align: center; padding: 12px 0;
+}
+.wisdom-insights { display: flex; flex-direction: column; gap: 8px; }
+.wisdom-insight {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface2); border-radius: 12px; padding: 10px 12px;
+  border-left: 3px solid transparent;
+  animation: fadeSlideIn 0.35s ease both;
+}
+@keyframes fadeSlideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.wisdom-insight.good { border-left-color: var(--accent); }
+.wisdom-insight.warn { border-left-color: var(--fat); }
+.wisdom-insight.bad  { border-left-color: var(--accent3); }
+.wisdom-insight.info { border-left-color: var(--accent2); }
+.wisdom-insight.water { border-left-color: #5ab4f5; }
+.wisdom-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.wisdom-text { font-size: 13px; line-height: 1.55; color: var(--text); }
+.wisdom-text b { font-weight: 600; }
+.wisdom-food-tag {
+  display: inline-block; font-size: 10px; background: var(--border);
+  border-radius: 6px; padding: 1px 6px; color: var(--muted); margin-bottom: 2px;
+}
   .gemini-required-notice a { color: var(--accent2); }
+  /* Needs API key notice */
+  
+
+  
 </style>
 </head>
 <body>
@@ -671,7 +720,19 @@
           </div>
         </div>
       </div>
-
+<!-- Food Wisdom Card -->
+<div class="card wisdom-card" id="wisdom-card" style="display:none">
+  <div class="wisdom-header">
+    <div class="wisdom-title">Food Wisdom</div>
+    <button class="wisdom-refresh-btn" onclick="fetchWisdom(true)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
+  </div>
+  <div id="wisdom-content">
+    <div class="wisdom-empty">Log food to get smart nutrition tips ✦</div>
+  </div>
+</div>
       <!-- Finish Day -->
       <button class="finish-day-btn" onclick="showDaySummary()">
         ✦ Finish Day &amp; See Report
@@ -1015,6 +1076,10 @@ function renderAll() {
   renderFoodLog();
   renderProgress();
   renderSettings();
+  if (todayLog.length > 0) {
+    document.getElementById('wisdom-card').style.display = 'block';
+    if (geminiKey && !wisdomFetched) fetchWisdom(false);
+  }
 }
 
 function renderHeader() {
@@ -1407,7 +1472,8 @@ function confirmAIItems() {
   setAIStatus('', '');
   pendingAIItems = [];
 
-  showToast(`✅ ${count} item${count>1?'s':''} added!`, true);
+ showToast(`✅ ${count} item${count>1?'s':''} added!`, true);
+triggerWisdomUpdate();
 }
 
 function getMealByTime() {
@@ -1642,7 +1708,104 @@ function exportCSV() {
   URL.revokeObjectURL(url);
   showToast('✅ CSV Downloaded!', true);
 }
+// =================== FOOD WISDOM ===================
+let wisdomFetched = false;
+let wisdomDebounce = null;
 
+function triggerWisdomUpdate() {
+  if (todayLog.length > 0) {
+    document.getElementById('wisdom-card').style.display = 'block';
+  }
+  if (!geminiKey) return;
+  clearTimeout(wisdomDebounce);
+  wisdomDebounce = setTimeout(() => fetchWisdom(false), 800);
+}
+
+async function fetchWisdom(forceRefresh) {
+  if (!geminiKey) return;
+  if (!todayLog.length) return;
+
+  const t = getTotals();
+  const target = profile.targetCal || 2000;
+  const tProt = profile.targetProt || 150;
+  const tCarbs = profile.targetCarbs || 200;
+  const tFat = profile.targetFat || 65;
+  const foodList = todayLog.map(i => i.name).join(', ');
+  const contentEl = document.getElementById('wisdom-content');
+
+  contentEl.innerHTML = `<div class="wisdom-loading"><div class="spinner"></div>Thinking about your food...</div>`;
+
+  const prompt = `You are a fun, insightful nutrition coach. The user has logged these foods today: "${foodList}".
+
+Their nutrition stats:
+- Calories: ${Math.round(t.cal)} / ${target} kcal
+- Protein: ${t.prot.toFixed(1)}g / ${tProt}g target
+- Carbs: ${t.carbs.toFixed(1)}g / ${tCarbs}g target
+- Fat: ${t.fat.toFixed(1)}g / ${tFat}g target
+- Goal: ${profile.goal || 'maintain'}
+
+Give 4-6 smart, personalized, specific insights about what they ate. Mix these types:
+- Fun food facts (e.g. "chocolate boosts serotonin", "eggs contain choline for brain health")
+- Warnings or concerns (e.g. "this meal is low in fiber")
+- What's missing or what to add next (e.g. "you need more protein — try Greek yogurt")
+- Water/hydration reminders if relevant
+- Positive reinforcement for good choices
+- Micro-nutrient highlights (iron, magnesium, calcium, vitamin C etc.)
+
+Be specific to the actual foods logged. Be conversational and short. No generic advice.
+
+Return ONLY a JSON array (no markdown, no extra text):
+[
+  {
+    "type": "good" | "warn" | "bad" | "info" | "water",
+    "icon": "emoji",
+    "food": "food name this is about (or empty string)",
+    "text": "insight text with <b>bold</b> for key words, max 2 sentences"
+  }
+]`;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+      })
+    });
+
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    text = text.replace(/```json\n?/gi,'').replace(/```\n?/gi,'').trim();
+
+    let insights;
+    try { insights = JSON.parse(text); }
+    catch {
+      const m = text.match(/\[[\s\S]+\]/);
+      if (m) insights = JSON.parse(m[0]);
+      else throw new Error('parse failed');
+    }
+
+    if (!Array.isArray(insights) || !insights.length) throw new Error('empty');
+
+    contentEl.innerHTML = `<div class="wisdom-insights">` +
+      insights.map((ins, i) => `
+        <div class="wisdom-insight ${ins.type || 'info'}" style="animation-delay:${i*0.06}s">
+          <div class="wisdom-icon">${ins.icon || '💡'}</div>
+          <div class="wisdom-text">
+            ${ins.food ? `<div class="wisdom-food-tag">${ins.food}</div>` : ''}
+            ${ins.text}
+          </div>
+        </div>
+      `).join('') +
+    `</div>`;
+
+    wisdomFetched = true;
+  } catch(e) {
+    contentEl.innerHTML = `<div class="wisdom-empty" style="color:var(--accent3)">Couldn't load insights. Tap Refresh to try again.</div>`;
+  }
+}
 // =================== SEARCH ===================
 async function searchFood() {
   const q = document.getElementById('search-input').value.trim();
@@ -1743,6 +1906,7 @@ function addSearchFood() {
   document.getElementById('search-add-panel').style.display = 'none';
   showPage('home', document.querySelector('.nav-btn'));
   showToast('✅ Added to log!', true);
+  triggerWisdomUpdate();
 }
 
 // =================== MANUAL ===================
@@ -1775,6 +1939,7 @@ function addManualEntry() {
   document.getElementById('man-carbs').value = '';
   document.getElementById('man-fat').value = '';
   showToast('✅ Added!', true);
+  triggerWisdomUpdate();
 }
 
 // =================== PROFILE ===================
