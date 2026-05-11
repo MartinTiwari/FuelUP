@@ -1778,25 +1778,12 @@ Their nutrition stats:
 - Fat: ${t.fat.toFixed(1)}g / ${tFat}g target
 - Goal: ${profile.goal || 'maintain'}
 
-Give 4-6 smart, personalized, specific insights about what they ate. Mix these types:
-- Fun food facts (e.g. "chocolate boosts serotonin", "eggs contain choline for brain health")
-- Warnings or concerns (e.g. "this meal is low in fiber")
-- What's missing or what to add next (e.g. "you need more protein — try Greek yogurt")
-- Water/hydration reminders if relevant
-- Positive reinforcement for good choices
-- Micro-nutrient highlights (iron, magnesium, calcium, vitamin C etc.)
+Write a single short paragraph (3-4 sentences max) like a friendly nutrition coach talking directly to the user. mention specific foods they ate, highlight one good thing, one concern, and one suggestion. Be casual, warm, and specific. No bullet points, no lists.
 
-Be specific to the actual foods logged. Be conversational and short. No generic advice.
-
-Return ONLY a JSON array (no markdown, no extra text):
-[
-  {
-    "type": "good" | "warn" | "bad" | "info" | "water",
-    "icon": "emoji",
-    "food": "food name this is about (or empty string)",
-    "text": "insight text with <b>bold</b> for key words, max 2 sentences"
-  }
-]`;
+Return ONLY a JSON object (no markdown, no extra text):
+{
+  "summary": "your paragraph here"
+}`;
 
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`, {
@@ -1815,25 +1802,15 @@ Return ONLY a JSON array (no markdown, no extra text):
 
     let insights;
     try { insights = JSON.parse(text); }
-    catch {
-      const m = text.match(/\[[\s\S]+\]/);
-      if (m) insights = JSON.parse(m[0]);
-      else throw new Error('parse failed');
-    }
+catch {
+  const m = text.match(/\{[\s\S]+\}/);
+  if (m) insights = JSON.parse(m[0]);
+  else throw new Error('parse failed');
+}
 
-    if (!Array.isArray(insights) || !insights.length) throw new Error('empty');
+if (!insights.summary) throw new Error('empty');
 
-    contentEl.innerHTML = `<div class="wisdom-insights">` +
-      insights.map((ins, i) => `
-        <div class="wisdom-insight ${ins.type || 'info'}" style="animation-delay:${i*0.06}s">
-          <div class="wisdom-icon">${ins.icon || '💡'}</div>
-          <div class="wisdom-text">
-            ${ins.food ? `<div class="wisdom-food-tag">${ins.food}</div>` : ''}
-            ${ins.text}
-          </div>
-        </div>
-      `).join('') +
-    `</div>`;
+contentEl.innerHTML = `<div style="font-size:13px;line-height:1.7;color:var(--text)">${insights.summary}</div>`;
 
     wisdomFetched = true;
   } catch(e) {
